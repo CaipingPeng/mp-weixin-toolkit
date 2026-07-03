@@ -32,4 +32,34 @@ describe("exportAllComments", () => {
     expect(doc.export.completed).toBe(true);
     expect(doc.export.comment_count).toBe(2);
   });
+
+  it("stops instead of downloading partial data when the API returns a risk response", async () => {
+    await expect(
+      exportAllComments({
+        initialRequest: {
+          url: "https://mp.weixin.qq.com/misc/appmsgcomment?action=list_comment&begin=0&count=20",
+          method: "GET"
+        },
+        article: { id: "a1", title: "Article", url: "https://mp.weixin.qq.com/s/example", metadata: {} },
+        fetchPage: async () => ({ base_resp: { ret: 200003, err_msg: "risk control" } }),
+        delay: async () => undefined
+      })
+    ).rejects.toThrow(/risk|session|unexpected/i);
+  });
+
+  it("stops when the max page limit is reached before the end", async () => {
+    await expect(
+      exportAllComments({
+        initialRequest: {
+          url: "https://mp.weixin.qq.com/misc/appmsgcomment?action=list_comment&begin=0&count=1",
+          method: "GET"
+        },
+        article: { id: "a1", title: "Article", url: "https://mp.weixin.qq.com/s/example", metadata: {} },
+        count: 1,
+        maxPages: 1,
+        fetchPage: async () => ({ base_resp: { ret: 0 }, total: 2, comment_list: [{ comment_id: "c1" }] }),
+        delay: async () => undefined
+      })
+    ).rejects.toThrow(/max page/i);
+  });
 });

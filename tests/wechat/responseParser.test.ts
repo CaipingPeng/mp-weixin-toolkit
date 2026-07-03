@@ -28,4 +28,17 @@ describe("parseCommentPage", () => {
       parseCommentPage({ base_resp: { ret: 200003, err_msg: "invalid session" } }, { offset: 0, count: 20 })
     ).toThrow(/session|risk|unexpected/i);
   });
+
+  it("rejects non-empty responses that contain no comment list", () => {
+    expect(() => parseCommentPage({ base_resp: { ret: 0 }, total: 10 }, { offset: 0, count: 20 })).toThrow(
+      /comment list/i
+    );
+  });
+
+  it("allows an empty article response", () => {
+    const page = parseCommentPage({ base_resp: { ret: 0 }, total: 0, comment_list: [] }, { offset: 0, count: 20 });
+
+    expect(page.records).toEqual([]);
+    expect(page.hasMore).toBe(false);
+  });
 });

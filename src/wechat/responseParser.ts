@@ -18,9 +18,13 @@ export function parseCommentPage(response: unknown, cursor: ParseCursor): Parsed
 
   assertBaseResponseIsUsable(response);
 
-  const roots = findFirstArray(response, ["comment_list", "comments", "list", "elected_comment"]);
-  const records = flattenComments(roots);
   const total = readNumber(response, ["total", "comment_count", "total_count"]);
+  const roots = findFirstArray(response, ["comment_list", "comments", "list", "elected_comment"]);
+  if (roots.length === 0 && cursor.offset === 0 && total !== 0) {
+    throw new Error("Unexpected comment response: comment list not found");
+  }
+
+  const records = flattenComments(roots);
   const hasMoreFlag = readBoolean(response, ["has_more", "can_msg_continue"]);
   const nextOffset = cursor.offset + cursor.count;
   const hasMore = hasMoreFlag ?? (total === null ? roots.length >= cursor.count : nextOffset < total);

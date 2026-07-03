@@ -25,6 +25,7 @@ export async function exportAllComments(options: ExportAllCommentsOptions): Prom
 
   const rawRecords: Record<string, unknown>[] = [];
   let offset = 0;
+  let reachedEnd = false;
 
   for (let pageIndex = 0; pageIndex < maxPages; pageIndex += 1) {
     const request = withPagination(options.initialRequest, offset, count);
@@ -32,10 +33,17 @@ export async function exportAllComments(options: ExportAllCommentsOptions): Prom
     const page = parseCommentPage(response, { offset, count });
 
     rawRecords.push(...page.records);
-    if (!page.hasMore) break;
+    if (!page.hasMore) {
+      reachedEnd = true;
+      break;
+    }
 
     offset = page.nextOffset;
     await delay(900);
+  }
+
+  if (!reachedEnd) {
+    throw new Error(`Export stopped after max page limit: ${maxPages}`);
   }
 
   const deduped = dedupeRecords(rawRecords);
