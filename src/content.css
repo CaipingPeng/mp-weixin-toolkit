@@ -3,4 +3,30 @@
   align-items: center;
   gap: 8px;
   margin-left: 8px;
+  vertical-align: middle;
+}
+
+.wechat-comment-export-button {
+  border: 1px solid #07c160;
+  border-radius: 4px;
+  background: #07c160;
+  color: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 7px 12px;
+}
+
+.wechat-comment-export-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.wechat-comment-export-status {
+  color: #576b95;
+  font-size: 12px;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
