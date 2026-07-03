@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "WeChat MP Comment Exporter",
+  "version": "0.1.0",
+  "description": "Export current WeChat Official Account article comments as tree-structured JSON.",
+  "host_permissions": ["https://mp.weixin.qq.com/*"],
+  "content_scripts": [
+    {
+      "matches": ["https://mp.weixin.qq.com/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["pageBridge.js"],
+      "matches": ["https://mp.weixin.qq.com/*"]
+    }
+  ]
+}

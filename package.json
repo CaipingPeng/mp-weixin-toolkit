@@ -1,0 +1,19 @@
+{
+  "name": "wechat-mp-comment-exporter",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.268",
+    "esbuild": "^0.23.0",
+    "jsdom": "^24.1.1",
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5"
+  }
+}
