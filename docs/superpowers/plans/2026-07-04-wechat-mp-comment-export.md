@@ -184,7 +184,7 @@ Create `public/manifest.json`:
 }
 ```
 
-- [ ] **Step 5: Create placeholder entries**
+- [ ] **Step 5: Create minimal entries**
 
 Create `src/content.ts`:
 
