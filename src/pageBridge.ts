@@ -1,4 +1,5 @@
 import { isCommentListRequest, type DiscoveredRequest } from "./wechat/requestDiscovery";
+import { hasRecognizableCommentPage } from "./wechat/responseParser";
 
 const DISCOVERED_EVENT = "WECHAT_COMMENT_EXPORT_DISCOVERED_REQUEST";
 const REQUEST_LAST_EVENT = "WECHAT_COMMENT_EXPORT_REQUEST_LAST";
@@ -15,8 +16,10 @@ function remember(request: DiscoveredRequest): void {
 function patchFetch(): void {
   const originalFetch = window.fetch;
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-    remember(toDiscoveredFetchRequest(input, init));
-    return originalFetch(input, init);
+    const request = toDiscoveredFetchRequest(input, init);
+    const response = await originalFetch(input, init);
+    void rememberIfCommentPage(request, () => response.clone().json());
+    return response;
   };
 }
 
@@ -39,10 +42,13 @@ function patchXhr(): void {
   ): void {
     const request = metadata.get(this);
     if (request) {
-      remember({
+      const discoveredRequest = {
         url: request.url,
         method: request.method,
         body: typeof body === "string" ? body : undefined
+      };
+      this.addEventListener("load", () => {
+        void rememberIfCommentPage(discoveredRequest, () => parseXhrJson(this));
       });
     }
     return originalSend.call(this, body);
@@ -70,4 +76,20 @@ function bodyToString(body: BodyInit | null | undefined): string | undefined {
   if (typeof body === "string") return body;
   if (body instanceof URLSearchParams) return body.toString();
   return undefined;
+}
+
+async function rememberIfCommentPage(request: DiscoveredRequest, readJson: () => Promise<unknown>): Promise<void> {
+  if (!isCommentListRequest(request)) return;
+  try {
+    const response = await readJson();
+    if (hasRecognizableCommentPage(response)) remember(request);
+  } catch {
+    // Non-JSON or unrelated list responses are ignored.
+  }
+}
+
+async function parseXhrJson(xhr: XMLHttpRequest): Promise<unknown> {
+  if (xhr.responseType === "json") return xhr.response;
+  if (xhr.responseType && xhr.responseType !== "text") throw new Error("XHR response is not text");
+  return JSON.parse(xhr.responseText);
 }

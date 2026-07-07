@@ -6,8 +6,20 @@ export interface DiscoveredRequest {
 }
 
 export function isCommentListRequest(request: DiscoveredRequest): boolean {
-  const haystack = `${request.url}\n${request.body ?? ""}`.toLowerCase();
-  return haystack.includes("appmsgcomment") && /list|comment/.test(haystack);
+  const url = parseRequestUrl(request.url);
+  const body = new URLSearchParams(request.body ?? "");
+  const action = (url?.searchParams.get("action") ?? body.get("action") ?? "").toLowerCase();
+
+  return (
+    url?.hostname === "mp.weixin.qq.com" &&
+    url.pathname.endsWith("/misc/appmsgcomment") &&
+    /^list(?:_|$)/.test(action)
+  );
+}
+
+export function createCurrentPageCommentRequest(href: string = window.location.href): DiscoveredRequest | null {
+  const request = { url: href, method: "GET" };
+  return isCommentListRequest(request) ? request : null;
 }
 
 export function sanitizeDiscoveredRequest(request: DiscoveredRequest): DiscoveredRequest {
@@ -47,4 +59,12 @@ function sanitizeHeaders(headers: Record<string, string> | undefined): Record<st
 
 function isSensitiveKey(key: string): boolean {
   return /token|cookie|pass_ticket|authorization|credential/i.test(key);
+}
+
+function parseRequestUrl(url: string): URL | null {
+  try {
+    return new URL(url, window.location.href);
+  } catch {
+    return null;
+  }
 }

@@ -17,7 +17,7 @@ export interface ExportAllCommentsOptions {
 }
 
 export async function exportAllComments(options: ExportAllCommentsOptions): Promise<ExportDocument> {
-  const count = options.count ?? 20;
+  const count = options.count ?? readRequestCount(options.initialRequest) ?? 20;
   const maxPages = options.maxPages ?? 500;
   const fetchPage = options.fetchPage ?? fetchWechatCommentPage;
   const delay = options.delay ?? defaultDelay;
@@ -56,6 +56,17 @@ export async function exportAllComments(options: ExportAllCommentsOptions): Prom
     exportedAt: now(),
     completed: true
   });
+}
+
+function readRequestCount(request: DiscoveredRequest): number | null {
+  try {
+    const urlCount = new URL(request.url, window.location.href).searchParams.get("count");
+    const count = urlCount ?? (request.body ? new URLSearchParams(request.body).get("count") : null);
+    const parsed = Number(count);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+  } catch {
+    return null;
+  }
 }
 
 async function fetchWithRetry(

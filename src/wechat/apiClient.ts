@@ -11,7 +11,10 @@ export async function fetchWechatCommentPage(request: DiscoveredRequest): Promis
     throw new Error(`Comment request failed: HTTP ${response.status}`);
   }
 
-  return response.json();
+  const text = await response.text();
+  const contentType = response.headers.get("content-type") ?? "";
+  if (/json/i.test(contentType) || /^[\s\n\r]*[{[]/.test(text)) return JSON.parse(text);
+  return text;
 }
 
 export function withPagination(request: DiscoveredRequest, offset: number, count: number): DiscoveredRequest {

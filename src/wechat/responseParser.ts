@@ -11,7 +11,26 @@ export interface ParsedCommentPage {
   rawPageMetadata: Record<string, unknown>;
 }
 
+const COMMENT_LIST_KEYS = ["comment_list", "comments", "list", "elected_comment"];
+
+export function hasRecognizableCommentPage(response: unknown): boolean {
+  if (!isObject(response)) return false;
+  if (typeof response.comment_list === "string") {
+    try {
+      const parsed = JSON.parse(response.comment_list);
+      return isObject(parsed) && Array.isArray(parsed.comment);
+    } catch {
+      return false;
+    }
+  }
+  return findFirstArray(response, COMMENT_LIST_KEYS).found;
+}
+
 export function parseCommentPage(response: unknown, cursor: ParseCursor): ParsedCommentPage {
+  if (typeof response === "string") {
+    return parseHtmlCommentPage(response, cursor);
+  }
+
   if (!isObject(response)) {
     throw new Error("Unexpected comment response: response is not an object");
   }
@@ -19,7 +38,7 @@ export function parseCommentPage(response: unknown, cursor: ParseCursor): Parsed
   assertBaseResponseIsUsable(response);
 
   const total = readNumber(response, ["total", "comment_count", "total_count"]);
-  const roots = findFirstArray(response, ["comment_list", "comments", "list", "elected_comment"]);
+  const roots = findFirstArray(response, COMMENT_LIST_KEYS).items;
   if (roots.length === 0 && cursor.offset === 0 && total !== 0) {
     throw new Error("Unexpected comment response: comment list not found");
   }
@@ -64,18 +83,18 @@ function flattenComments(items: unknown[]): Record<string, unknown>[] {
   return records;
 }
 
-function findFirstArray(root: Record<string, unknown>, keys: string[]): unknown[] {
+function findFirstArray(root: Record<string, unknown>, keys: string[]): { found: boolean; items: unknown[] } {
   for (const key of keys) {
     const value = root[key];
-    if (Array.isArray(value)) return value;
+    if (Array.isArray(value)) return { found: true, items: value };
   }
   for (const value of Object.values(root)) {
     if (isObject(value)) {
       const nested = findFirstArray(value, keys);
-      if (nested.length > 0) return nested;
+      if (nested.found) return nested;
     }
   }
-  return [];
+  return { found: false, items: [] };
 }
 
 function collectPageMetadata(response: Record<string, unknown>): Record<string, unknown> {
@@ -84,6 +103,87 @@ function collectPageMetadata(response: Record<string, unknown>): Record<string, 
     if (key in response) metadata[key] = response[key];
   }
   return metadata;
+}
+
+function parseHtmlCommentPage(html: string, cursor: ParseCursor): ParsedCommentPage {
+  const document = new DOMParser().parseFromString(html, "text/html");
+  const commentElements = findRenderedCommentElements(document);
+
+  const records = commentElements.map((element, index) => htmlCommentElementToRecord(element, cursor.offset + index + 1));
+  const total = readHtmlTotal(document);
+  const nextOffset = cursor.offset + cursor.count;
+  const hasMore = total === null ? records.length >= cursor.count : nextOffset < total;
+
+  if (records.length === 0 && cursor.offset === 0 && total !== 0) {
+    throw new Error("Unexpected comment response: comment list not found");
+  }
+
+  return {
+    records,
+    total,
+    nextOffset,
+    hasMore,
+    rawPageMetadata: total === null ? {} : { total }
+  };
+}
+
+function findRenderedCommentElements(document: Document): HTMLElement[] {
+  const directCommentElements = Array.from(
+    document.querySelectorAll<HTMLElement>(
+      "#commentlist > div > .comment-list__item:not(.comment-reply), .comment-list-wrp > .comment-list__item:not(.comment-reply)"
+    )
+  ).filter(hasRenderedCommentContent);
+
+  if (directCommentElements.length > 0) return directCommentElements;
+
+  return Array.from(document.querySelectorAll<HTMLElement>(".comment-list__item")).filter(
+    (element) =>
+      !element.closest(".reply-dialog__wrp") && !element.classList.contains("comment-reply") && hasRenderedCommentContent(element)
+  );
+}
+
+function htmlCommentElementToRecord(element: HTMLElement, sequence: number): Record<string, unknown> {
+  const text = readText(element.querySelector(".comment-text:not(.comment-text_shield)"));
+  const nickname = readText(element.querySelector(".comment-nickname"));
+  const time = readText(element.querySelector(".comment-list__item-time"));
+  const avatar = element.querySelector<HTMLImageElement>("img.avatar")?.src ?? "";
+  const rawCommentId = element.getAttribute("data-commentid") ?? "";
+  const likeCount = readInteger(readText(element.querySelector(".comment_opr_meta__like span")));
+  const isElected = Boolean(element.querySelector('[title="取消精选"], .icon-starred'));
+
+  return {
+    comment_id: `dom-${sequence}`,
+    raw_comment_id: rawCommentId,
+    nickname,
+    avatar_url: avatar,
+    content: text,
+    time,
+    like_count: likeCount,
+    status: isElected ? "elected" : "",
+    source: "rendered_html"
+  };
+}
+
+function hasRenderedCommentContent(element: HTMLElement): boolean {
+  return Boolean(
+    readText(element.querySelector(".comment-text:not(.comment-text_shield)")) ||
+      readText(element.querySelector(".comment-nickname"))
+  );
+}
+
+function readHtmlTotal(document: Document): number | null {
+  const text = readText(document.querySelector(".filter-bar")) || document.body.textContent || "";
+  const match = text.match(/全部留言\((\d+)条\)/);
+  return match ? Number(match[1]) : null;
+}
+
+function readText(element: Element | null): string {
+  return element?.textContent?.replace(/\s+/g, " ").trim() ?? "";
+}
+
+function readInteger(text: string): number {
+  const value = Number(text.replace(/[^\d.-]/g, ""));
+  return Number.isFinite(value) ? value : 0;
 }
 
 function readNumber(raw: Record<string, unknown>, keys: string[]): number | null {

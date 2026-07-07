@@ -1,7 +1,7 @@
 import { downloadExportDocument } from "./export/download";
-import { exportAllComments } from "./export/orchestrator";
-import { mountExportButton, type ExportButtonControl } from "./ui/exportButton";
-import type { DiscoveredRequest } from "./wechat/requestDiscovery";
+import { exportCurrentPageComments } from "./export/currentPage";
+import { findExportButtonHost, mountExportButton, type ExportButtonControl } from "./ui/exportButton";
+import { createCurrentPageCommentRequest, type DiscoveredRequest } from "./wechat/requestDiscovery";
 
 const REQUEST_LAST_EVENT = "WECHAT_COMMENT_EXPORT_REQUEST_LAST";
 const RESPONSE_LAST_EVENT = "WECHAT_COMMENT_EXPORT_RESPONSE_LAST";
@@ -21,7 +21,7 @@ function injectPageBridge(): void {
 function mountWhenReady(): void {
   const interval = window.setInterval(() => {
     if (!isLikelyCommentPage()) return;
-    const host = findActionHost();
+    const host = findExportButtonHost();
     if (!host || host.querySelector(".wechat-comment-export-root")) return;
 
     let control: ExportButtonControl;
@@ -30,13 +30,15 @@ function mountWhenReady(): void {
       control.setStatus("Exporting...");
       try {
         const request = await getLastDiscoveredRequest();
-        if (!request) throw new Error("Open or refresh the comment list before exporting.");
-        const doc = await exportAllComments({
-          initialRequest: request,
-          article: getArticleContext()
+        const fallbackRequest = request ?? createCurrentPageCommentRequest();
+        const article = getArticleContext();
+        const doc = await exportCurrentPageComments({
+          request: fallbackRequest,
+          document,
+          article
         });
         downloadExportDocument(doc);
-        control.setStatus("Done");
+        control.setStatus(doc.export.completed ? "Done" : "Downloaded visible comments only");
       } catch (error) {
         control.setStatus(error instanceof Error ? error.message : "Export failed");
       } finally {
@@ -51,15 +53,7 @@ function mountWhenReady(): void {
 function isLikelyCommentPage(): boolean {
   return (
     /mp\.weixin\.qq\.com/.test(location.hostname) &&
-    /comment|appmsgcomment/.test(`${location.href} ${document.body.textContent ?? ""}`)
-  );
-}
-
-function findActionHost(): HTMLElement | null {
-  return (
-    document.querySelector<HTMLElement>(".weui-desktop-btn_wrp") ??
-    document.querySelector<HTMLElement>(".tool_area") ??
-    document.querySelector<HTMLElement>("body")
+    /comment|appmsgcomment/.test(`${location.href} ${document.body?.textContent ?? ""}`)
   );
 }
 

@@ -11,6 +11,26 @@ describe("request discovery", () => {
     ).toBe(true);
   });
 
+  it("detects latest comment list requests", () => {
+    expect(
+      isCommentListRequest({
+        url: "https://mp.weixin.qq.com/misc/appmsgcomment?action=list_latest_comment&begin=0&count=10",
+        method: "GET",
+        body: ""
+      })
+    ).toBe(true);
+  });
+
+  it("rejects non-list appmsgcomment requests", () => {
+    expect(
+      isCommentListRequest({
+        url: "https://mp.weixin.qq.com/misc/appmsgcomment?action=get_setting",
+        method: "GET",
+        body: ""
+      })
+    ).toBe(false);
+  });
+
   it("removes sensitive token-like fields from sanitized copies", () => {
     const sanitized = sanitizeDiscoveredRequest({
       url: "https://mp.weixin.qq.com/misc/appmsgcomment?action=list_comment&token=secret&begin=0",
