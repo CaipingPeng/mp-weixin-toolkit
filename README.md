@@ -39,4 +39,4 @@ npm run build
 7. Confirm root comments are in `comments` and replies are nested in `replies`.
 8. Confirm no token, cookie, or credential values appear in the JSON.
 
-Do not commit real exported comments or captured production API responses.
+## Do not commit real exported comments or captured production API responses.
